@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stellar Drift | Aesthetic Mini-Game</title>
+    <style>
+        :root {
+            --bg: #1a1a2e;
+            --pink: #ffb7c5;
+            --purple: #9d8df1;
+            --mint: #b2f7ef;
+            --glass: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            margin: 0;
+            background: #0f0c29;
+            background: linear-gradient(to bottom, #0f0c29, #302b63, #24243e);
+            color: #fff;
+            font-family: 'Segoe UI', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #game-wrapper {
+            position: relative;
+            width: 400px;
+            height: 600px;
+            border-radius: 30px;
+            box-shadow: 0 0 50px rgba(157, 141, 241, 0.3);
+            overflow: hidden;
+            border: 4px solid var(--glass);
+        }
+
+        #ui {
+            position: absolute;
+            top: 25px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-around;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .stat {
+            background: var(--glass);
+            backdrop-filter: blur(8px);
+            padding: 8px 20px;
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.2);
+            text-align: center;
+        }
+
+        .stat span { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.7; }
+        .stat b { font-size: 20px; font-weight: 600; color: var(--pink); }
+
+        .screen {
+            position: absolute;
+            inset: 0;
+            background: rgba(26, 26, 46, 0.85);
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            text-align: center;
+            padding: 20px;
+        }
+
+        h1 { margin: 0; font-weight: 300; letter-spacing: 4px; color: var(--mint); }
+        p { opacity: 0.8; margin-bottom: 30px; font-size: 14px; }
+
+        button {
+            background: var(--pink);
+            color: #4a1e26;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 30px;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+            transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        button:hover { transform: scale(1.1); box-shadow: 0 0 20px var(--pink); }
+
+        canvas { background: transparent; cursor: none; }
+    </style>
+</head>
+<body>
+
+    <div id="game-wrapper">
+        <div id="ui">
+            <div class="stat"><span>Stars</span><b id="score">0</b></div>
+            <div class="stat"><span>Best</span><b id="best">0</b></div>
+        </div>
+
+        <div id="start-screen" class="screen">
+            <h1>STELLAR</h1>
+            <p>Catch the stars, dodge the storm clouds.</p>
+            <button onclick="startGame()">Begin Journey</button>
+        </div>
+
+        <div id="end-screen" class="screen" style="display:none">
+            <h1 style="color:var(--pink)">REST TIME</h1>
+            <p id="final-score">You collected 0 stars.</p>
+            <button onclick="startGame()">Try Again</button>
+        </div>
+
+        <canvas id="canvas" width="400" height="600"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+        const bestEl = document.getElementById('best');
+
+        let score = 0;
+        let best = 0;
+        let active = false;
+        let player = { x: 200, y: 500, tx: 200, ty: 500, radius: 18 };
+        let items = [];
+        let particles = [];
+
+        function startGame() {
+            score = 0;
+            scoreEl.innerText = score;
+            items = [];
+            active = true;
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('end-screen').style.display = 'none';
+        }
+
+        function createParticle(x, y, color) {
+            for(let i=0; i<8; i++) {
+                particles.push({
+                    x, y,
+                    vX: (Math.random()-0.5)*5,
+                    vY: (Math.random()-0.5)*5,
+                    life: 1,
+                    color
+                });
+            }
+        }
+
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            player.tx = e.clientX - rect.left;
+            player.ty = e.clientY - rect.top;
+        });
+
+        function spawn() {
+            if(!active) return;
+            const isCloud = Math.random() > 0.7;
+            items.push({
+                x: Math.random() * 360 + 20,
+                y: -50,
+                type: isCloud ? 'cloud' : 'star',
+                speed: 3 + Math.random() * 2 + (score/20),
+                pulse: 0
+            });
+        }
+
+        setInterval(spawn, 800);
+
+        function draw() {
+            ctx.clearRect(0,0,400,600);
+
+            // Update Particles
+            particles.forEach((p, i) => {
+                p.x += p.vX; p.y += p.vY; p.life -= 0.02;
+                ctx.fillStyle = p.color.replace('1)', p.life + ')');
+                ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, Math.PI*2); ctx.fill();
+                if(p.life <= 0) particles.splice(i, 1);
+            });
+
+            if(active) {
+                // Smooth Player Movement (Lerp)
+                player.x += (player.tx - player.x) * 0.15;
+                player.y += (player.ty - player.y) * 0.15;
+
+                // Draw Player (Glowing Moon)
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = 'rgba(178, 247, 239, 0.5)';
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(player.x, player.y, player.radius, 0, Math.PI*2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+
+                // Process Stars and Clouds
+                items.forEach((item, i) => {
+                    item.y += item.speed;
+                    item.pulse += 0.1;
+
+                    if(item.type === 'star') {
+                        ctx.fillStyle = '#ffb7c5';
+                        const s = 8 + Math.sin(item.pulse)*2;
+                        drawStar(item.x, item.y, 5, s, s/2);
+                    } else {
+                        ctx.fillStyle = '#4a4a6a';
+                        ctx.beginPath();
+                        ctx.arc(item.x, item.y, 15, 0, Math.PI*2);
+                        ctx.arc(item.x+10, item.y-5, 12, 0, Math.PI*2);
+                        ctx.arc(item.x-10, item.y-5, 12, 0, Math.PI*2);
+                        ctx.fill();
+                    }
+
+                    // Collision
+                    const d = Math.hypot(player.x - item.x, player.y - item.y);
+                    if(d < player.radius + 15) {
+                        if(item.type === 'star') {
+                            score++;
+                            scoreEl.innerText = score;
+                            createParticle(item.x, item.y, 'rgba(255, 183, 197, 1)');
+                            items.splice(i, 1);
+                        } else {
+                            active = false;
+                            if(score > best) { best = score; bestEl.innerText = best; }
+                            document.getElementById('final-score').innerText = `You collected ${score} stars!`;
+                            document.getElementById('end-screen').style.display = 'flex';
+                        }
+                    }
+
+                    if(item.y > 650) items.splice(i, 1);
+                });
+            }
+
+            requestAnimationFrame(draw);
+        }
+
+        function drawStar(cx, cy, spikes, outerRadius, innerRadius) {
+            let rot = Math.PI / 2 * 3; let x = cx; let y = cy; let step = Math.PI / spikes;
+            ctx.beginPath(); ctx.moveTo(cx, cy - outerRadius);
+            for (let i = 0; i < spikes; i++) {
+                x = cx + Math.cos(rot) * outerRadius; y = cy + Math.sin(rot) * outerRadius;
+                ctx.lineTo(x, y); rot += step;
+                x = cx + Math.cos(rot) * innerRadius; y = cy + Math.sin(rot) * innerRadius;
+                ctx.lineTo(x, y); rot += step;
+            }
+            ctx.lineTo(cx, cy - outerRadius); ctx.closePath(); ctx.fill();
+        }
+
+        draw();
+    </script>
+</body>
+</html>
